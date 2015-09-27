@@ -1,0 +1,96 @@
+---
+title: "Practical Machine Learning Project Report"
+output: html_document
+---
+
+Introduction
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it.In this project, we will use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+Data Source
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project comes from this original source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+Please Note that I the code I use loads the data directly from the URL provided, so that you are not required to download the file to your environment. Please customize the code to your specific needs.
+
+
+Package Loading
+
+```{r}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(corrplot)
+```
+
+Download the data
+
+```{r}
+trainUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+training <- read.csv(url(trainUrl))
+testing <- read.csv(url(testUrl))
+```
+
+Clean the data
+```{r}
+training <- training[, colSums(is.na(training)) == 0] 
+testing <- testing[, colSums(is.na(testing)) == 0] 
+classe <- training$classe
+trainRemove <- grepl("^X|timestamp|window", names(training))
+training <- training[, !trainRemove]
+trainCleaned <- training[, sapply(training, is.numeric)]
+trainCleaned$classe <- classe
+testRemove <- grepl("^X|timestamp|window", names(testing))
+testing <- testing[, !testRemove]
+testCleaned <- testing[, sapply(testing, is.numeric)]
+```
+
+Get the trainning data and test data
+Partioning Training data set into two data sets, 60% for myTraining, 40% for myTesting
+set.
+```{r}
+set.seed(1988)
+inTrain <- createDataPartition(trainCleaned$classe, p=0.60, list=F)
+trainingdata <- trainCleaned[inTrain, ]
+testingdata <- trainCleaned[-inTrain, ]
+```
+
+
+Create the model from training data
+We used Random Forest algorithm to predict the model. We used 5-fold cross validation in the prediction.
+
+```{r}
+controlRf <- trainControl(method="cv", 5)
+modelRf <- train(classe ~ ., data=trainingdata, method="rf", trControl=controlRf, ntree=250)
+modelRf
+predictRf <- predict(modelRf, testingdata)
+confusionMatrix(testingdata$classe, predictRf)
+accuracy <- postResample(predictRf, testingdata$classe)
+accuracy
+```
+
+Predict fo the test data
+```{r}
+results <- predict(modelRf, testCleaned[, -length(names(testCleaned))])
+results
+```
+
+Correlation visulatization & Decision Tree
+```{r}
+corrPlot <- cor(trainingdata[, -length(names(trainingdata))])
+corrplot(corrPlot, method="color")
+treeModel <- rpart(classe ~ ., data=trainingdata, method="class")
+prp(treeModel)
+```
+
+
